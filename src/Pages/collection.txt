@@ -1,0 +1,378 @@
+/* eslint-disable no-unused-vars */
+import { useContext, useEffect, useState } from "react";
+import { ShopContext } from "../context/ShopContext.jsx";
+import { assets } from "../assets/assets.js";
+import Title from "../components/Title.jsx";
+import ProductItem from "../components/ProductItem.jsx";
+import { useLocation } from "react-router-dom";
+
+function Collection() {
+  const { products } = useContext(ShopContext);
+  const [showFilter, setShowFilter] = useState(false);
+
+  const [categoryFilter, setCategoryFilter] = useState([]); // Men/Women/Kids
+  const [subCategoryFilter, setSubCategoryFilter] = useState([]); // Topwear / Bottomwear / Sportswear
+  const [typeFilter, setTypeFilter] = useState([]);
+  const [sizeFilter, setSizeFilter] = useState([]); // Sizes filter
+  const [filterProducts, setFilterProducts] = useState([]);
+  const [sortType, setSortType] = useState("relavant");
+const { search } = useContext(ShopContext);
+
+    /* ---------------- HOME SHOP BY CATEGORY ---------------- */
+  const location = useLocation();
+
+  const searchQuery = new URLSearchParams(location.search).get("search") || "";
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+
+    const categoryFromURL = params.get("category");
+    const subCategoryFromURL = params.get("subCategory");
+    const typeFromURL = params.get("type");
+
+    // Priority order: type → subCategory → category
+    if (typeFromURL) {
+      setTypeFilter([typeFromURL]);
+      setCategoryFilter([]);
+      setSubCategoryFilter([]);
+    } 
+    else if (subCategoryFromURL) {
+      setCategoryFilter([]);
+      setSubCategoryFilter([subCategoryFromURL]);
+      setTypeFilter([]);
+    } 
+    else if (categoryFromURL) {
+      setCategoryFilter([categoryFromURL]);
+      setSubCategoryFilter([]);
+      setTypeFilter([]);
+    } 
+    else {
+      // Reset everything if no query params
+      setCategoryFilter([]);
+      setSubCategoryFilter([]);
+      setTypeFilter([]);
+    }
+
+  }, [location.search]);
+  /* ---------------- TOGGLE FUNCTIONS ---------------- */
+  const toggleCategory = (c) => {
+    if (categoryFilter.includes(c)) {
+      setCategoryFilter([]);
+      setSubCategoryFilter([]);
+      setTypeFilter([]);
+    } else {
+      setCategoryFilter([c]);
+      setSubCategoryFilter([]);
+      setTypeFilter([]);
+    }
+  };
+
+  const toggleSubCategory = (s) => {
+    // Only one subcategory active at a time
+    if (subCategoryFilter.includes(s)) {
+      setSubCategoryFilter([]);
+    } else {
+      setSubCategoryFilter([s]);
+    }
+    setTypeFilter([]);
+  };
+
+  const toggleType = (t) => {
+    setTypeFilter((prev) =>
+      prev.includes(t) ? prev.filter((i) => i !== t) : [...prev, t]
+    );
+  };
+
+  const toggleSize = (s) => {
+    setSizeFilter((prev) =>
+      prev.includes(s) ? prev.filter((i) => i !== s) : [...prev, s]
+    );
+  };
+
+  /* ---------------- APPLY FILTER ---------------- */
+ const applyFilter = () => {
+  let filtered = [...products];
+
+  // 1️⃣ Apply left filters first
+  if (categoryFilter.length > 0) {
+    filtered = filtered.filter((item) =>
+      categoryFilter.includes(item.category)
+    );
+  }
+
+  if (subCategoryFilter.length > 0) {
+    filtered = filtered.filter((item) =>
+      subCategoryFilter.includes(item.subCategory)
+    );
+  }
+
+  if (typeFilter.length > 0) {
+    filtered = filtered.filter((item) =>
+      typeFilter.some(
+        (t) => item.type && t.toLowerCase().trim() === item.type.toLowerCase().trim()
+      )
+    );
+  }
+
+  if (sizeFilter.length > 0) {
+    filtered = filtered.filter((item) =>
+      item.sizes?.some((sz) => sizeFilter.includes(sz))
+    );
+  }
+
+  // OLD:
+// if (searchQuery.trim() !== "") {
+if (search.trim() !== "") {
+  const normalize = (text) =>
+    text
+      ?.toLowerCase()
+      .replace(/[-&]/g, "")
+      .replace(/\s+/g, "")
+      .replace(/s$/, "");
+
+  const searchTerm = normalize(search);
+
+  filtered = filtered.filter((item) => {
+    const fieldsToSearch = [
+      item.name,
+      item.category,
+      item.subCategory,
+      item.type,
+      ...(item.sizes || []),
+    ];
+
+    return fieldsToSearch.some((field) =>
+      normalize(field)?.includes(searchTerm)
+    );
+  });
+}
+  setFilterProducts(filtered);
+};
+
+  /* ---------------- SORT PRODUCTS ---------------- */
+  const sortProduct = () => {
+    let filteredCopy = [...filterProducts];
+    switch (sortType) {
+      case "low-high":
+        setFilterProducts(
+          filteredCopy.sort((a, b) => a.price.discounted - b.price.discounted)
+        );
+        break;
+      case "high-low":
+        setFilterProducts(
+          filteredCopy.sort((a, b) => b.price.discounted - a.price.discounted)
+        );
+        break;
+      default:
+        applyFilter();
+        break;
+    }
+  };
+
+  useEffect(() => {
+    applyFilter();
+  }, [
+    categoryFilter,
+    subCategoryFilter,
+    typeFilter,
+    sizeFilter,
+    products,
+    searchQuery,
+    search// ✅ important
+  ]);
+  useEffect(() => {
+    sortProduct();
+  }, [sortType]);
+
+  /* ---------------- FILTER DATA ---------------- */
+  const categoriesList = ["Men", "Women", "Kids"];
+  const sizes = ["S", "M", "L", "XL", "XXL"];
+
+  const categories = {
+    Men: {
+      Topwear: [
+        "T-shirts","Shirts","Oversized T-shirts","Classic Fit T-shirts",
+        "Half Sleeve T-shirts","Printed T-shirts","Plain T-shirts","Pull Size Topwear",
+        "Customize T-shirts","Hoodies","Sweatshirts","Jackets","Sweaters","Windcheaters","Full Sleeve T-shirts"
+      ],
+      Bottomwear: [
+        "Joggers","Trackpants","Jeans","Shorts","Boxers","Plus Size Bottom","Cargo",
+        "Cargo Joggers","Cargo Pants","Parachute Pants","Baggy Jeans","Straight Fit Jeans","Baggy Pants"
+      ],
+      Sportswear: ["Tracksuits","Gym Tees","Shorts"]
+    },
+    Women: {
+      Topwear: [
+        "T-shirts","Oversized T-shirts","Classic Fit Shirts","Half Sleeve T-shirts","Printed T-shirts",
+        "Plain T-shirts","Fashion Tops","Hoodies","Sweatshirts","Jackets","Sweaters",
+        "Customize T-shirts","Windcheaters","Full Sleeve T-shirts"
+      ],
+      Bottomwear: [
+        "Joggers","Track Pants","Trousers & Pants","Jeans","Plus Size Bottom","Cargos",
+        "Cargo Joggers","Cargo Pants","Korean Pants","Parachute Pants","Wide Leg Jeans","Baggy Pants","Straight Fit Jeans"
+      ],
+      Sportswear: ["Tracksuits","Gym Tees","Leggings","Shorts"]
+    },
+    Kids: {
+      Topwear: ["T-shirts","Hoodies","Sweatshirts","Tops"],
+      Bottomwear: ["Jeans","Shorts","Leggings","Trousers"],
+      Sportswear: ["Tracksuits","Sports Tees","Shorts"]
+    }
+  };
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-6 pt-10 border-t">
+      {/* LEFT FILTER PANEL */}
+      <div className="min-w-60">
+        <p
+          onClick={() => setShowFilter(!showFilter)}
+          className="my-2 text-xl flex items-center cursor-pointer gap-2 font-semibold"
+        >
+          FILTERS
+          <img
+            className={`h-3 sm:hidden ${showFilter ? "rotate-90" : ""}`}
+            src={assets.dropdown_icon}
+            alt=""
+          />
+        </p>
+
+        <div className={`border border-gray-300 p-5 mt-6 rounded-lg shadow-sm ${showFilter ? "" : "hidden"} sm:block`}>
+          {/* Category Filter */}
+          <div className="mb-6">
+            <p className="text-sm font-medium mb-2">Category</p>
+            <div className="ml-3 flex flex-col gap-3 text-sm font-light text-gray-700">
+              {categoriesList.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => toggleCategory(c)}
+                  className={`flex items-center gap-2 p-2 rounded-lg w-full text-left hover:bg-blue-50 transition-colors font-medium ${
+                    categoryFilter.includes(c) ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Subcategory Filter */}
+          {categoriesList.map((c) =>
+            categoryFilter.includes(c) ? (
+              <div key={c} className="mb-6">
+                <p className="text-sm font-medium mb-3">{c} Categories</p>
+                <div className="ml-3 flex flex-col gap-3 text-sm font-light text-gray-700">
+                  {Object.keys(categories[c]).map((subCat) => (
+                    <div key={subCat}>
+                      <label className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors">
+                        <input
+                          type="checkbox"
+                          value={subCat}
+                          checked={subCategoryFilter.includes(subCat)}
+                          onChange={() => toggleSubCategory(subCat)}
+                          className="w-3 h-3"
+                        />
+                        {subCat}
+                      </label>
+
+                      {/* Types under subcategory */}
+                      {subCategoryFilter.includes(subCat) && (
+                        <div className="ml-5 mt-1 flex flex-col gap-2">
+                          {categories[c][subCat].map((type) => (
+                            <label key={type} className="flex items-center gap-2 cursor-pointer hover:text-blue-600 transition-colors">
+                              <input
+                                type="checkbox"
+                                value={type}
+                                checked={typeFilter.includes(type)}
+                                onChange={() => toggleType(type)}
+                                className="w-3 h-3"
+                              />
+                              {type}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null
+          )}
+
+          {/* Size Filter - Horizontal */}
+          <div className="mb-6">
+            <p className="text-sm font-medium mb-2">Sizes</p>
+            <div className="flex gap-3 flex-wrap">
+              {sizes.map((sz) => (
+                <label
+                  key={sz}
+                  className={`border px-3 py-1 rounded cursor-pointer ${
+                    sizeFilter.includes(sz) ? "bg-blue-500 text-white" : "bg-gray-100"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    value={sz}
+                    checked={sizeFilter.includes(sz)}
+                    onChange={() => toggleSize(sz)}
+                    className="hidden"
+                  />
+                  {sz}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* RIGHT SIDE - Products */}
+      <div className="flex-1">
+        <div className="flex justify-between text-base sm:text-2xl mb-4">
+          <Title text1={"ALL"} text2={"COLLECTIONS"} />
+          <select
+            onChange={(e) => setSortType(e.target.value)}
+            className="border-2 border-gray-300 text-sm px-2 rounded"
+          >
+            <option value="relavant">Sort by : Relevant</option>
+            <option value="low-high">Sort by : Low to High</option>
+            <option value="high-low">Sort by : High to Low</option>
+          </select>
+        </div>
+        
+              
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 gap-y-6">
+          {filterProducts.map((item) => {
+            const isOutOfStock = !item.inStock;
+            const showFewItems = item.fewItemsLeft && item.inStock;
+            let discountPercent = 0;
+
+            if (
+              item.price?.original &&
+              item.price?.discounted &&
+              item.price.original > item.price.discounted
+            ) {
+              discountPercent = Math.round(
+                ((item.price.original - item.price.discounted) / item.price.original) * 100
+              );
+            }
+
+            return (
+              <ProductItem
+                key={item._id}
+                id={item._id}
+                name={item.name}
+                image={item.image}
+                price={item.price}
+                discountPercent={discountPercent}
+                bestseller={item.bestseller}
+                inStock={!isOutOfStock}
+                outOfStock={isOutOfStock}
+                fewItemsLeft={showFewItems}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default Collection;

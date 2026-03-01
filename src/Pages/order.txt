@@ -1,0 +1,267 @@
+import { useContext, useEffect, useState, useMemo } from "react";
+import { ShopContext } from "../context/ShopContext";
+import Title from "../components/Title";
+import axios from "axios";
+import { toast } from "react-toastify";
+
+function Orders() {
+  const { backendURL, accessToken, currency } = useContext(ShopContext);
+  const [orderData, setOrderData] = useState([]);
+  const [filteredStatus, setFilteredStatus] = useState("All orders");
+  const [expandedOrder, setExpandedOrder] = useState(null);
+
+  /* ================= FETCH USER ORDERS ================= */
+  const loadOrderData = async () => {
+    if (!accessToken) return;
+    try {
+      const response = await axios.post(
+        `${backendURL}/api/order/userorders`,
+        {},
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+
+      if (response.data.success) {
+        // Flatten items
+        let allOrdersItem = [];
+        response.data.orders.forEach((order) => {
+          allOrdersItem.push({
+            ...order,
+            orderId: order._id?.slice(-6).toUpperCase() || "N/A",
+          });
+        });
+        setOrderData(allOrdersItem.reverse());
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Failed to load orders. Please login again.");
+    }
+  };
+
+  useEffect(() => {
+    loadOrderData();
+  }, [accessToken]);
+
+  /* ================= CANCEL ORDER ================= */
+  const cancelOrder = async (orderId) => {
+    try {
+      const res = await axios.post(
+        `${backendURL}/api/order/cancel`,
+        { orderId },
+        { headers: { Authorization: `Bearer ${accessToken}` } }
+      );
+      if (res.data.success) {
+        toast.success("Order cancelled successfully!");
+        loadOrderData();
+      } else {
+        toast.error(res.data.message || "Failed to cancel order.");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("Error cancelling order.");
+    }
+  };
+
+  /* ================= COPY HANDLERS ================= */
+  const copyProductId = (productId) => {
+    navigator.clipboard.writeText(productId);
+    toast.success("Product ID copied!");
+  };
+
+  const copyAddress = (address) => {
+    if (!address) return;
+    const text = `${address.name}\n${address.phone}\n${address.address}, ${address.locality}, ${address.city}, ${address.state} - ${address.pincode}`;
+    navigator.clipboard.writeText(text);
+    toast.success("Address copied!");
+  };
+
+  /* ================= STATUS COLOR ================= */
+  const getStatusClasses = (status) => {
+    switch (status?.toLowerCase()) {
+      case "order placed":
+        return "bg-yellow-100 text-yellow-700";
+      case "delivered":
+        return "bg-green-100 text-green-700";
+      case "cancelled":
+        return "bg-red-100 text-red-700";
+      case "packing":
+        return "bg-blue-100 text-blue-700";
+      case "shipped":
+        return "bg-purple-100 text-purple-700";
+      case "out for delivery":
+        return "bg-indigo-100 text-indigo-700";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  /* ================= FILTER ================= */
+  const filteredOrders =
+    filteredStatus === "All orders"
+      ? orderData
+      : orderData.filter(
+          (item) =>
+            item.status?.toLowerCase() === filteredStatus.toLowerCase()
+        );
+
+  /* ================= INR FORMAT ================= */
+  const formatINR = (value) => {
+    const amount = Number(value) || 0;
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+    }).format(amount);
+  };
+
+  return (
+    <div className="p-4 sm:p-6 bg-gray-50 min-h-screen">
+      <div className="max-w-screen-lg mx-auto space-y-6">
+        {/* ---------- HEADER ---------- */}
+        <div className="border-b border-gray-300 pb-4 mb-6 flex items-center flex-wrap gap-4">
+          <h3 className="text-2xl font-semibold text-slate-900">
+            <Title text1={"ORDER"} text2={"HISTORY"} />
+          </h3>
+
+          <select
+            value={filteredStatus}
+            onChange={(e) => setFilteredStatus(e.target.value)}
+            className="ml-auto appearance-none cursor-pointer bg-white border border-gray-300 outline-0 px-4 py-2 text-slate-900 rounded-md text-[15px]"
+          >
+            <option>All orders</option>
+            <option>Order Placed</option>
+            <option>Packing</option>
+            <option>Shipped</option>
+            <option>Out for delivery</option>
+            <option>Delivered</option>
+            <option>Cancelled</option>
+          </select>
+        </div>
+
+        {/* ---------- ORDERS LIST ---------- */}
+        {filteredOrders.length === 0 ? (
+          <p className="text-center text-gray-600 mt-8">
+            No orders found for this status.
+          </p>
+        ) : (
+          filteredOrders.map((order) => (
+            <div
+              key={order._id}
+              className="bg-white rounded-xl shadow p-5 cursor-pointer mb-4"
+              onClick={() =>
+                setExpandedOrder(expandedOrder === order._id ? null : order._id)
+              }
+            >
+              {/* HEADER */}
+              <div className="flex justify-between items-center flex-wrap">
+                <div>
+                  <h4 className="font-semibold text-lg">
+                    Order ID: {order.orderId}
+                  </h4>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusClasses(
+                      order.status
+                    )}`}
+                  >
+                    {order.status}
+                  </span>
+                  <p className="text-xs text-gray-400 mt-1">
+                    {new Date(order.date || order.createdAt).toLocaleString()}
+                  </p>
+                </div>
+
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpandedOrder(
+                      expandedOrder === order._id ? null : order._id
+                    );
+                  }}
+                  className="text-sm text-indigo-600 font-medium"
+                >
+                  {expandedOrder === order._id ? "Hide Details" : "View Details"}
+                </button>
+              </div>
+
+              {/* COLLAPSIBLE DETAILS */}
+              {expandedOrder === order._id && (
+                <div className="mt-4 space-y-4">
+                  {/* ITEMS */}
+                  {order.items?.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="flex justify-between items-center border-b pb-2 text-sm"
+                    >
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                        <span>
+                          {item.name || item.productId?.name} × {item.quantity}
+                        </span>
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <span>({item.productId?._id || "N/A"})</span>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              copyProductId(item.productId?._id || "N/A");
+                            }}
+                            className="bg-gray-100 px-2 py-1 rounded hover:bg-gray-200"
+                          >
+                            Copy Product ID
+                          </button>
+                        </div>
+                      </div>
+                      <div className="font-semibold">
+                        {formatINR(item.price?.discounted ?? item.price ?? 0)}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* ADDRESS */}
+                  <div className="bg-gray-50 p-4 rounded-lg border text-sm relative">
+                    <div className="flex justify-between items-start mb-2">
+                      <p className="font-semibold">Shipping Details</p>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          copyAddress(order.address);
+                        }}
+                        className="text-xs bg-gray-200 px-3 py-1 rounded hover:bg-gray-300"
+                      >
+                        Copy Address
+                      </button>
+                    </div>
+                    <p>{order.address?.name}</p>
+                    <p>{order.address?.phone}</p>
+                    <p>
+                      {order.address?.address}, {order.address?.locality}
+                    </p>
+                    <p>
+                      {order.address?.city}, {order.address?.state} -{" "}
+                      {order.address?.pincode}
+                    </p>
+                  </div>
+
+                  {/* TOTAL & CANCEL */}
+                  <div className="flex justify-between items-center mt-2">
+                    <p className="font-bold text-lg">
+                      Total: {formatINR(order.amount)}
+                    </p>
+
+                    {order.status?.toLowerCase() !== "delivered" &&
+                      order.status?.toLowerCase() !== "cancelled" && (
+                        <button
+                          onClick={() => cancelOrder(order._id)}
+                          className="text-[13px] px-3 py-1.5 rounded-md bg-red-500 text-white hover:bg-red-600 transition"
+                        >
+                          Cancel Order
+                        </button>
+                      )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default Orders;
