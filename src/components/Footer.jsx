@@ -18,7 +18,7 @@ const Footer = () => {
 
           {/* Admin Contact */}
           <p className="text-sm text-black-400 mt-1">
-            Phone: +91 98521 54789 | Email: contact@foreveryou.com
+            Phone: +91 63623 50435 | Email: modaleyendaa@gmail.com
           </p>
 
           {/* Navigation Links */}
